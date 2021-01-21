@@ -1,0 +1,53 @@
+version: '3.5'
+
+services:
+    mongodb:
+        image: mongo
+        ports:
+            - "27017:27017"
+    rabbitmq:
+        image: rabbitmq
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        healthcheck:
+              test: "/opt/rabbitmq/sbin/rabbitmqctl status"
+              timeout: 20s
+              retries: 10
+              interval: 10s
+    celery:
+        build:
+            context: .
+            dockerfile: ./celery_app/Dockerfile
+        environment:
+            - RABBITMQ_PORT=5672
+        command: bash -c 'bash /celery_app/celery_start.sh && tail -F /dev/null'
+        ports:
+            - "5555:5555"
+        depends_on:
+            - rabbitmq
+    main_app:
+        build:
+            context: .
+            dockerfile: ./main_app/Dockerfile
+        environment:
+            - MONGODB_PORT=27017
+            - API_PORT=5000
+            - NOTIFICATION_PORT=5002
+        command: bash -c 'bash /main_app/start.sh && sleep 5 && tail -F /dev/null'
+        ports:
+            - "5000:5000"
+        depends_on:
+            - mongodb
+            - celery
+        working_dir: /main_app
+
+    main_test:
+        build:
+            context: .
+            dockerfile: ./main_app/Dockerfile
+        depends_on:
+            - main_app
+        working_dir: /main_app
+
+
